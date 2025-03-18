@@ -13,7 +13,7 @@ This repository contains an implementation of a Support Vector Machine (SVM) fro
 
 1. Clone the repository:
    ```bash
-   git clone <repository-url>
+   git clone https://github.com/nijiyamaharjan/Implementing_SVM_from_Scratch.git
    cd <project-directory>
    ```
 
