@@ -1,0 +1,345 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MNIST Digit Recognition</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f5f5f5;
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+        .container {
+            max-width: 800px;
+            background-color: white;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+            margin-bottom: 20px;
+        }
+        h1 {
+            color: #333;
+            text-align: center;
+        }
+        .tabs {
+            display: flex;
+            margin-bottom: 20px;
+        }
+        .tab {
+            padding: 10px 20px;
+            cursor: pointer;
+            background-color: #e0e0e0;
+            border: none;
+            outline: none;
+            transition: background-color 0.3s;
+        }
+        .tab:first-child {
+            border-radius: 5px 0 0 5px;
+        }
+        .tab:last-child {
+            border-radius: 0 5px 5px 0;
+        }
+        .tab.active {
+            background-color: #007bff;
+            color: white;
+        }
+        .tab-content {
+            display: none;
+        }
+        .tab-content.active {
+            display: block;
+        }
+        #canvas-container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+        #drawing-canvas {
+            border: 2px solid #333;
+            background-color: black;
+            cursor: crosshair;
+        }
+        #upload-container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+        .buttons {
+            margin-top: 20px;
+            display: flex;
+            gap: 10px;
+        }
+        button {
+            padding: 10px 20px;
+            background-color: #007bff;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: background-color 0.3s;
+        }
+        button:hover {
+            background-color: #0056b3;
+        }
+        .result {
+            margin-top: 20px;
+            padding: 20px;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+            text-align: center;
+            font-size: 18px;
+        }
+        .predicted-digit {
+            font-size: 72px;
+            font-weight: bold;
+            color: #007bff;
+        }
+        .hidden {
+            display: none;
+        }
+        #preview-image {
+            max-width: 280px;
+            max-height: 280px;
+            margin-top: 10px;
+            border: 1px solid #ccc;
+        }
+        .loading {
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #3498db;
+            border-radius: 50%;
+            width: 30px;
+            height: 30px;
+            animation: spin 2s linear infinite;
+            margin: 10px auto;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>MNIST Digit Recognition</h1>
+        
+        <div class="tabs">
+            <button class="tab active" onclick="switchTab('draw')">Draw Digit</button>
+            <button class="tab" onclick="switchTab('upload')">Upload Image</button>
+        </div>
+        
+        <div id="draw-tab" class="tab-content active">
+            <div id="canvas-container">
+                <canvas id="drawing-canvas" width="280" height="280"></canvas>
+                <div class="buttons">
+                    <button onclick="clearCanvas()">Clear Canvas</button>
+                    <button onclick="predictDrawing()">Predict Digit</button>
+                </div>
+            </div>
+        </div>
+        
+        <div id="upload-tab" class="tab-content">
+            <div id="upload-container">
+                <input type="file" id="image-upload" accept="image/*" onchange="previewImage()">
+                <img id="preview-image" class="hidden">
+                <div class="buttons">
+                    <button onclick="predictUploadedImage()">Predict Digit</button>
+                </div>
+            </div>
+        </div>
+        
+        <div id="result" class="result hidden">
+            <div id="loading" class="loading hidden"></div>
+            <div>Predicted Digit:</div>
+            <div id="predicted-digit" class="predicted-digit"></div>
+        </div>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('drawing-canvas');
+        const ctx = canvas.getContext('2d');
+        let isDrawing = false;
+
+        // Initialize canvas
+        ctx.fillStyle = 'black';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        ctx.strokeStyle = 'white';
+        ctx.lineWidth = 15;
+        ctx.lineCap = 'round';
+        ctx.lineJoin = 'round';
+
+        // Drawing functions
+        function startDrawing(e) {
+            isDrawing = true;
+            draw(e);
+        }
+
+        function stopDrawing() {
+            isDrawing = false;
+            ctx.beginPath();
+        }
+
+        function draw(e) {
+            if (!isDrawing) return;
+            
+            const rect = canvas.getBoundingClientRect();
+            const x = e.clientX - rect.left;
+            const y = e.clientY - rect.top;
+            
+            ctx.lineTo(x, y);
+            ctx.stroke();
+            ctx.beginPath();
+            ctx.moveTo(x, y);
+        }
+
+        // Clear canvas
+        function clearCanvas() {
+            ctx.fillStyle = 'black';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            hideResult();
+        }
+
+        // Switch between tabs
+        function switchTab(tab) {
+            const tabs = document.querySelectorAll('.tab');
+            const tabContents = document.querySelectorAll('.tab-content');
+            
+            tabs.forEach(t => t.classList.remove('active'));
+            tabContents.forEach(c => c.classList.remove('active'));
+            
+            if (tab === 'draw') {
+                document.querySelector('.tab:first-child').classList.add('active');
+                document.getElementById('draw-tab').classList.add('active');
+            } else {
+                document.querySelector('.tab:last-child').classList.add('active');
+                document.getElementById('upload-tab').classList.add('active');
+            }
+            
+            hideResult();
+        }
+
+        // Preview uploaded image
+        function previewImage() {
+            const fileInput = document.getElementById('image-upload');
+            const previewImage = document.getElementById('preview-image');
+            
+            if (fileInput.files && fileInput.files[0]) {
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    previewImage.src = e.target.result;
+                    previewImage.classList.remove('hidden');
+                }
+                reader.readAsDataURL(fileInput.files[0]);
+                hideResult();
+            }
+        }
+
+        // Predict functions
+        function predictDrawing() {
+            showLoading();
+            const imageData = canvas.toDataURL('image/png');
+            
+            const formData = new FormData();
+            formData.append('drawing', imageData);
+            
+            fetch('/predict', {
+                method: 'POST',
+                body: formData
+            })
+            .then(response => response.json())
+            .then(data => {
+                hideLoading();
+                showResult(data.prediction);
+            })
+            .catch(error => {
+                hideLoading();
+                console.error('Error:', error);
+                alert('An error occurred while predicting the digit.');
+            });
+        }
+
+        function predictUploadedImage() {
+            const fileInput = document.getElementById('image-upload');
+            
+            if (fileInput.files && fileInput.files[0]) {
+                showLoading();
+                
+                const formData = new FormData();
+                formData.append('file', fileInput.files[0]);
+                
+                fetch('/predict', {
+                    method: 'POST',
+                    body: formData
+                })
+                .then(response => response.json())
+                .then(data => {
+                    hideLoading();
+                    showResult(data.prediction);
+                })
+                .catch(error => {
+                    hideLoading();
+                    console.error('Error:', error);
+                    alert('An error occurred while predicting the digit.');
+                });
+            } else {
+                alert('Please select an image first.');
+            }
+        }
+
+        // UI helpers
+        function showResult(prediction) {
+            document.getElementById('result').classList.remove('hidden');
+            document.getElementById('predicted-digit').textContent = prediction;
+        }
+
+        function hideResult() {
+            document.getElementById('result').classList.add('hidden');
+        }
+
+        function showLoading() {
+            document.getElementById('loading').classList.remove('hidden');
+        }
+
+        function hideLoading() {
+            document.getElementById('loading').classList.add('hidden');
+        }
+
+        // Event listeners
+        canvas.addEventListener('mousedown', startDrawing);
+        canvas.addEventListener('mousemove', draw);
+        canvas.addEventListener('mouseup', stopDrawing);
+        canvas.addEventListener('mouseout', stopDrawing);
+
+        // Touch support for mobile devices
+        canvas.addEventListener('touchstart', function(e) {
+            e.preventDefault();
+            const touch = e.touches[0];
+            const mouseEvent = new MouseEvent('mousedown', {
+                clientX: touch.clientX,
+                clientY: touch.clientY
+            });
+            canvas.dispatchEvent(mouseEvent);
+        });
+
+        canvas.addEventListener('touchmove', function(e) {
+            e.preventDefault();
+            const touch = e.touches[0];
+            const mouseEvent = new MouseEvent('mousemove', {
+                clientX: touch.clientX,
+                clientY: touch.clientY
+            });
+            canvas.dispatchEvent(mouseEvent);
+        });
+
+        canvas.addEventListener('touchend', function(e) {
+            e.preventDefault();
+            const mouseEvent = new MouseEvent('mouseup', {});
+            canvas.dispatchEvent(mouseEvent);
+        });
+    </script>
+</body>
+</html>
