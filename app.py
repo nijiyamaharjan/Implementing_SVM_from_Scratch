@@ -10,11 +10,10 @@ from skimage.feature import hog
 import base64
 from io import BytesIO
 from PIL import Image
+from tqdm import tqdm
 
-# Initialize FastAPI app
 app = FastAPI()
 
-# Enable CORS
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -23,7 +22,6 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Define the enhance_contrast function
 def enhance_contrast(image):
     """Enhance contrast using CLAHE"""
     img = image.reshape(28, 28).astype(np.uint8)
@@ -31,7 +29,6 @@ def enhance_contrast(image):
     enhanced = clahe.apply(img)
     return enhanced.flatten()
 
-# Define the extract_hog_features function
 def extract_hog_features(image):
     """Extract HOG features from an image"""
     img = image.reshape((28, 28))
@@ -49,7 +46,6 @@ def extract_hog_features(image):
     
     return fd
 
-# Define the SVM class
 class SVM:
     def __init__(self, learning_rate=0.001, lambda_param=0.01, n_iterations=1000):
         self.learning_rate = learning_rate
@@ -101,7 +97,6 @@ class SVM:
         y_pred = np.dot(X, self.weights) + self.bias
         return np.sign(y_pred)
 
-# Define the OneVsRestSVM class
 class OneVsRestSVM:
     def __init__(self, learning_rate=0.001, lambda_param=0.01, n_iterations=1000):
         self.learning_rate = learning_rate
@@ -129,13 +124,11 @@ class OneVsRestSVM:
             scores[:, idx] = np.dot(X, model.weights) + model.bias
         return self.classes[np.argmax(scores, axis=1)]
 
-# Load the saved model
 print("Loading model...")
 try:
     with open("mnist_svm_model.pkl", "rb") as f:
         model_data = pickle.load(f)
     
-    # Extract the model components
     model = model_data["model"]
     scaler = model_data["scaler"]
     preprocessing_pipeline = model_data["preprocessing_pipeline"]
@@ -144,7 +137,6 @@ try:
 except Exception as e:
     print(f"Error loading model: {e}")
 
-# Preprocess image function
 def preprocess_image(image):
     """Preprocess an image for prediction"""
     if image.shape != (28, 28):
@@ -155,7 +147,6 @@ def preprocess_image(image):
     scaled_features = scaler.transform([hog_features])
     return scaled_features
 
-# Prediction endpoint
 @app.post("/predict")
 async def predict(file: UploadFile = File(None), drawing: str = Form(None)):
     try:
@@ -181,7 +172,6 @@ async def predict(file: UploadFile = File(None), drawing: str = Form(None)):
         print(f"Error: {str(e)}")
         return JSONResponse(content={"error": str(e)}, status_code=500)
 
-# Serve static files
 app.mount("/", StaticFiles(directory="static", html=True), name="static")
 
 if __name__ == "__main__":
